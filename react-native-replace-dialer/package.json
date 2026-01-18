@@ -1,0 +1,20 @@
+{
+  "name": "react-native-replace-dialer",
+  "version": "1.0.0",
+  "description": "A small local package for replacing the dialer (stub)",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"No tests\" && exit 0"
+  },
+  "keywords": [
+    "react-native",
+    "dialer",
+    "local"
+  ],
+  "author": "pyazdizadeh",
+  "license": "MIT",
+  "peerDependencies": {
+    "react": ">=16.8.0",
+    "react-native": ">=0.60.0"
+  }
+}
