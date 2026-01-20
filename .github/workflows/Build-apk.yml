@@ -40,20 +40,23 @@ jobs:
         with:
           node-version: 18
 
-      # 5️⃣ Install OpenJDK 8
-      - name: Install OpenJDK 8
+      # 5️⃣ Install OpenJDK 17
+      - name: Install OpenJDK 17
         run: |
           sudo apt update
-          sudo apt install -y openjdk-8-jdk
-          echo "JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64" >> $GITHUB_ENV
+          sudo apt install -y openjdk-17-jdk
+          echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> $GITHUB_ENV
 
-      # 6️⃣ Setup Android SDK & NDK
-      - name: Setup Android SDK and NDK
+      # 6️⃣ Setup Android SDK with valid packages
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          api-level: 19
-          ndk-version: 17.2.4988734
-          build-tools: 25.2.5
+          cmdline-tools-version: "latest"
+          accept-android-sdk-licenses: true
+          packages: |
+            platforms;android-19
+            build-tools;25.2.5
+            ndk;17.2.4988734
 
       # 7️⃣ Install NPM dependencies
       - name: Install dependencies
@@ -130,7 +133,7 @@ jobs:
           name: android-apk
           path: $GITHUB_WORKSPACE/dist/JOOLIO\ GSM\ Gateway.apk
 
-      # 1️⃣5️⃣ Update README with download link
+      # 1️⃣5️⃣ Update README with APK link
       - name: Update README with APK link
         if: success()
         uses: actions/github-script@v7
