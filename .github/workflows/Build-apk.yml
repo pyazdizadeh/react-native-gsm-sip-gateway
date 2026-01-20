@@ -6,7 +6,7 @@ on:
       - "*"
 
 jobs:
-  build_android: 
+  build_android:
     runs-on: ubuntu-latest
     env:
       ANDROID_HOME: $HOME/android-sdk
@@ -75,6 +75,24 @@ jobs:
       - name: Install NPM dependencies
         run: npm install
         working-directory: telon-gateway-app
+
+      # 🔹 Upload npm logs on failure with path info
+      - name: Upload npm logs
+        if: failure()
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/logs
+          for f in /home/runner/.npm/_logs/*.log; do
+            echo "Copying npm log file: $f"
+            cp "$f" $GITHUB_WORKSPACE/logs/
+          done
+        continue-on-error: true
+
+      - name: Upload npm log artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-logs
+          path: $GITHUB_WORKSPACE/logs/
 
       # 9️⃣ Bundle React Native assets
       - name: Bundle React Native assets
