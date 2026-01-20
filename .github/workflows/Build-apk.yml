@@ -1,4 +1,4 @@
-name: Build Android APK (Lightweight, No sdkmanager)
+name: Build Android APK (Lightweight, Stable)
 
 on:
   push:
@@ -13,20 +13,20 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Setup Node.js
+      # 2️⃣ Setup Node.js 18
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      # 3️⃣ Install OpenJDK 11 (Runner default usually enough)
-      - name: Install JDK
+      # 3️⃣ Install JDK 11 (enough for gradle & build)
+      - name: Install OpenJDK
         run: |
           sudo apt update
           sudo apt install -y openjdk-11-jdk
           echo "JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64" >> $GITHUB_ENV
 
-      # 4️⃣ Download command line tools (cmdline-tools)
+      # 4️⃣ Download Android cmdline-tools
       - name: Download Android Command-line Tools
         run: |
           mkdir -p $HOME/android-sdk/cmdline-tools
@@ -34,10 +34,11 @@ jobs:
           unzip -q cmdline-tools.zip -d $HOME/android-sdk/cmdline-tools
           mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
           rm cmdline-tools.zip
+          # Set environment variables properly
           echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
-          echo "$HOME/android-sdk/cmdline-tools/latest/bin:$PATH" >> $GITHUB_ENV
+          echo "PATH=$HOME/android-sdk/cmdline-tools/latest/bin:$PATH" >> $GITHUB_ENV
 
-      # 5️⃣ Download specific NDK manually
+      # 5️⃣ Download NDK r17b
       - name: Download NDK r17b
         run: |
           mkdir -p $HOME/android-ndk
@@ -53,7 +54,7 @@ jobs:
         working-directory: telon-gateway-app
 
       # 7️⃣ Bundle React Native assets
-      - name: Bundle React Native
+      - name: Bundle React Native assets
         run: |
           mkdir -p android/app/build/intermediates/assets/release/
           npx react-native bundle \
