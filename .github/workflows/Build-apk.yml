@@ -50,16 +50,17 @@ jobs:
       # 6️⃣ Clean node_modules and cache
       - name: Clean node_modules
         run: |
-          rm -rf telon-gateway-app/node_modules
-          rm -f telon-gateway-app/package-lock.json
+          rm -rf node_modules
+          rm -f package-lock.json
           npm cache clean --force
         working-directory: telon-gateway-app
 
       # 7️⃣ Ensure Metro config exists
       - name: Setup Metro config
         run: |
-          if [ ! -f telon-gateway-app/metro.config.js ]; then
-            curl -L -o telon-gateway-app/metro.config.js https://raw.githubusercontent.com/react-native-community/template/main/template/metro.config.js
+          mkdir -p .
+          if [ ! -f metro.config.js ]; then
+            curl -L -o metro.config.js https://raw.githubusercontent.com/react-native-community/template/main/template/metro.config.js
           fi
         working-directory: telon-gateway-app
 
@@ -83,10 +84,10 @@ jobs:
       # 🔟 Generate random keystore
       - name: Generate random Keystore
         run: |
-          KEYSTORE_PATH="telon-gateway-app/android/app/my-release-key.keystore"
+          KEYSTORE_PATH="android/app/my-release-key.keystore"
           if [ ! -f "$KEYSTORE_PATH" ]; then
             PASSWORD=$(openssl rand -base64 12)
-            echo "$PASSWORD" >> $GITHUB_ENV
+            echo "KEYSTORE_PASSWORD=$PASSWORD" >> $GITHUB_ENV
             keytool -genkey -v \
               -keystore "$KEYSTORE_PATH" \
               -alias joolio-key \
@@ -96,29 +97,32 @@ jobs:
               -keypass $PASSWORD \
               -dname "CN=Mohammad Yazdizadeh, OU=Dev, O=JOOLIO, L=City, S=State, C=US"
           fi
+        working-directory: telon-gateway-app
 
       # 1️⃣1️⃣ Set APK metadata
       - name: Set APK Metadata
         run: |
-          MANIFEST_FILE=telon-gateway-app/android/app/src/main/AndroidManifest.xml
+          MANIFEST_FILE=android/app/src/main/AndroidManifest.xml
           sed -i 's|android:label=".*"|android:label="JOOLIO GSM Gateway"|' $MANIFEST_FILE
           sed -i '/<application / a\
           <meta-data android:name="Author" android:value="Mohammad Yazdizadeh"/>\
           <meta-data android:name="Company" android:value="JOOLIO"/>\
           <meta-data android:name="Website" android:value="https://joolio.me"/>' $MANIFEST_FILE
+        working-directory: telon-gateway-app
 
       # 1️⃣2️⃣ Build APK
       - name: Build Android Release APK
         working-directory: telon-gateway-app/android
         run: |
           chmod +x gradlew
-          ./gradlew clean assembleRelease -Pkeystore.password=$PASSWORD
+          ./gradlew clean assembleRelease -Pkeystore.password=$KEYSTORE_PASSWORD
 
       # 1️⃣3️⃣ Copy APK to dist
       - name: Copy APK
         run: |
           mkdir -p $GITHUB_WORKSPACE/dist
           cp app/build/outputs/apk/release/*.apk "$GITHUB_WORKSPACE/dist/JOOLIO GSM Gateway.apk"
+        working-directory: telon-gateway-app/android
 
       # 1️⃣4️⃣ Upload APK
       - name: Upload APK artifact
