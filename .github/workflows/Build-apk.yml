@@ -68,7 +68,7 @@ jobs:
       - name: Install NPM dependencies
         run: npm install
         working-directory: telon-gateway-app
-        continue-on-error: true   # ⚠️ اضافه شد برای ادامه حتی بعد از خطا
+        continue-on-error: true
 
       # 9️⃣ Save npm logs (حتی بعد از خطا)
       - name: Save npm logs
@@ -84,7 +84,6 @@ jobs:
             done
           else
             echo "No npm log files found in /home/runner/.npm/_logs/"
-          fi
 
       # 🔟 Upload npm log artifact
       - name: Upload npm log artifact
@@ -94,7 +93,12 @@ jobs:
           name: npm-logs
           path: $GITHUB_WORKSPACE/logs/
 
-      # 1️⃣1️⃣ Bundle React Native assets
+      # 1️⃣1️⃣ Install React Native CLI
+      - name: Install React Native CLI
+        run: npm install @react-native-community/cli@latest --save-dev
+        working-directory: telon-gateway-app
+
+      # 1️⃣2️⃣ Bundle React Native assets
       - name: Bundle React Native assets
         if: success()
         run: |
@@ -107,7 +111,7 @@ jobs:
             --assets-dest android/app/build/intermediates/res/merged/release
         working-directory: telon-gateway-app
 
-      # 1️⃣2️⃣ Generate random keystore
+      # 1️⃣3️⃣ Generate random keystore
       - name: Generate random Keystore
         if: success()
         run: |
@@ -126,7 +130,7 @@ jobs:
           fi
         working-directory: telon-gateway-app
 
-      # 1️⃣3️⃣ Set APK metadata
+      # 1️⃣4️⃣ Set APK metadata
       - name: Set APK Metadata
         if: success()
         run: |
@@ -138,7 +142,7 @@ jobs:
           <meta-data android:name="Website" android:value="https://joolio.me"/>' $MANIFEST_FILE
         working-directory: telon-gateway-app
 
-      # 1️⃣4️⃣ Build Android Release APK
+      # 1️⃣5️⃣ Build Android Release APK
       - name: Build Android Release APK
         if: success()
         working-directory: telon-gateway-app/android
@@ -146,7 +150,7 @@ jobs:
           chmod +x gradlew
           ./gradlew clean assembleRelease -Pkeystore.password=$KEYSTORE_PASSWORD
 
-      # 1️⃣5️⃣ Copy APK to dist
+      # 1️⃣6️⃣ Copy APK to dist
       - name: Copy APK
         if: success()
         run: |
@@ -154,7 +158,7 @@ jobs:
           cp app/build/outputs/apk/release/*.apk "$GITHUB_WORKSPACE/dist/JOOLIO GSM Gateway.apk"
         working-directory: telon-gateway-app/android
 
-      # 1️⃣6️⃣ Upload APK
+      # 1️⃣7️⃣ Upload APK artifact
       - name: Upload APK artifact
         if: success()
         uses: actions/upload-artifact@v4
