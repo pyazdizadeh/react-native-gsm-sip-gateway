@@ -1,4 +1,4 @@
-name: Build Android APK (Stable, Node 18, Local Package Fix)
+name: Build Android APK (Stable, Node 18, Metro Fix)
 
 on:
   push:
@@ -47,12 +47,28 @@ jobs:
           echo "NDK_HOME=$HOME/android-ndk/android-ndk-r17b" >> $GITHUB_ENV
           echo "ANDROID_NDK_HOME=$HOME/android-ndk/android-ndk-r17b" >> $GITHUB_ENV
 
-      # 6️⃣ Install NPM dependencies
-      - name: Install NPM dependencies
-        run: npm ci
+      # 6️⃣ Clean node_modules and cache
+      - name: Clean node_modules
+        run: |
+          rm -rf telon-gateway-app/node_modules
+          rm -f telon-gateway-app/package-lock.json
+          npm cache clean --force
         working-directory: telon-gateway-app
 
-      # 7️⃣ Bundle React Native assets
+      # 7️⃣ Ensure Metro config exists
+      - name: Setup Metro config
+        run: |
+          if [ ! -f telon-gateway-app/metro.config.js ]; then
+            curl -L -o telon-gateway-app/metro.config.js https://raw.githubusercontent.com/react-native-community/template/main/template/metro.config.js
+          fi
+        working-directory: telon-gateway-app
+
+      # 8️⃣ Install NPM dependencies
+      - name: Install NPM dependencies
+        run: npm install
+        working-directory: telon-gateway-app
+
+      # 9️⃣ Bundle React Native assets
       - name: Bundle React Native assets
         run: |
           mkdir -p android/app/build/intermediates/assets/release/
@@ -64,7 +80,7 @@ jobs:
             --assets-dest android/app/build/intermediates/res/merged/release
         working-directory: telon-gateway-app
 
-      # 8️⃣ Generate random keystore
+      # 🔟 Generate random keystore
       - name: Generate random Keystore
         run: |
           KEYSTORE_PATH="telon-gateway-app/android/app/my-release-key.keystore"
@@ -81,15 +97,7 @@ jobs:
               -dname "CN=Mohammad Yazdizadeh, OU=Dev, O=JOOLIO, L=City, S=State, C=US"
           fi
 
-      # 9️⃣ Set versionCode and versionName automatically
-      - name: Set APK Version
-        run: |
-          BUILD_DATE=$(date +%Y%m%d)
-          BUILD_NUMBER=$(date +%H%M%S)
-          sed -i "s/versionCode [0-9]\+/versionCode $BUILD_NUMBER/" telon-gateway-app/android/app/build.gradle
-          sed -i "s/versionName \".*\"/versionName \"$BUILD_DATE-$BUILD_NUMBER\"/" telon-gateway-app/android/app/build.gradle
-
-      # 🔟 Set application metadata
+      # 1️⃣1️⃣ Set APK metadata
       - name: Set APK Metadata
         run: |
           MANIFEST_FILE=telon-gateway-app/android/app/src/main/AndroidManifest.xml
@@ -99,20 +107,20 @@ jobs:
           <meta-data android:name="Company" android:value="JOOLIO"/>\
           <meta-data android:name="Website" android:value="https://joolio.me"/>' $MANIFEST_FILE
 
-      # 1️⃣1️⃣ Build APK
+      # 1️⃣2️⃣ Build APK
       - name: Build Android Release APK
         working-directory: telon-gateway-app/android
         run: |
           chmod +x gradlew
           ./gradlew clean assembleRelease -Pkeystore.password=$PASSWORD
 
-      # 1️⃣2️⃣ Copy APK to dist
+      # 1️⃣3️⃣ Copy APK to dist
       - name: Copy APK
         run: |
           mkdir -p $GITHUB_WORKSPACE/dist
           cp app/build/outputs/apk/release/*.apk "$GITHUB_WORKSPACE/dist/JOOLIO GSM Gateway.apk"
 
-      # 1️⃣3️⃣ Upload APK
+      # 1️⃣4️⃣ Upload APK
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
