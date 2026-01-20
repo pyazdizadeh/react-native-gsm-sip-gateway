@@ -34,7 +34,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      # 4️⃣ Setup Node.js
+      # 4️⃣ Setup Node.js 18
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -129,3 +129,26 @@ jobs:
         with:
           name: android-apk
           path: $GITHUB_WORKSPACE/dist/JOOLIO\ GSM\ Gateway.apk
+
+      # 1️⃣5️⃣ Update README with download link
+      - name: Update README with APK link
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_TOKEN }}
+          script: |
+            const artifactName = "android-apk";
+            const run_id = process.env.GITHUB_RUN_ID;
+            const repo = process.env.GITHUB_REPOSITORY;
+            const owner = repo.split('/')[0];
+            const repoName = repo.split('/')[1];
+            const url = `https://github.com/${owner}/${repoName}/suites/${run_id}/artifacts`;
+
+            const fs = require('fs');
+            const readmePath = 'README.md';
+            let readme = fs.existsSync(readmePath) ? fs.readFileSync(readmePath, 'utf8') : '';
+            const apkLine = `\n[Download Latest APK - JOOLIO GSM Gateway](${url})\n`;
+            if (!readme.includes(apkLine)) {
+              readme += apkLine;
+              fs.writeFileSync(readmePath, readme, 'utf8');
+            }
