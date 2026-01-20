@@ -8,13 +8,6 @@ on:
 jobs:
   build_android:
     runs-on: ubuntu-latest
-    env:
-      ANDROID_HOME: $HOME/android-sdk
-      ANDROID_SDK_ROOT: $HOME/android-sdk
-      JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
-      NDK_HOME: $HOME/android-ndk/android-ndk-r17b
-      ANDROID_NDK_HOME: $HOME/android-ndk/android-ndk-r17b
-
     steps:
       # 1️⃣ Checkout repo
       - name: Checkout Repository
@@ -75,22 +68,25 @@ jobs:
       - name: Install NPM dependencies
         run: npm install
         working-directory: telon-gateway-app
+        continue-on-error: true   # ⚠️ اضافه شد برای ادامه حتی بعد از خطا
 
-      # 🔹 Save npm logs always
+      # 9️⃣ Save npm logs (حتی بعد از خطا)
       - name: Save npm logs
         if: always()
+        continue-on-error: true
         run: |
           mkdir -p $GITHUB_WORKSPACE/logs
+          echo "Looking for npm log files in /home/runner/.npm/_logs/"
           if compgen -G "/home/runner/.npm/_logs/*.log" > /dev/null; then
             for f in /home/runner/.npm/_logs/*.log; do
-              echo "Saving npm log file: $f"
+              echo "Copying npm log file: $f"
               cp "$f" $GITHUB_WORKSPACE/logs/
             done
           else
-            echo "No npm log files found"
+            echo "No npm log files found in /home/runner/.npm/_logs/"
           fi
-        continue-on-error: true
 
+      # 🔟 Upload npm log artifact
       - name: Upload npm log artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -98,8 +94,9 @@ jobs:
           name: npm-logs
           path: $GITHUB_WORKSPACE/logs/
 
-      # 9️⃣ Bundle React Native assets
+      # 1️⃣1️⃣ Bundle React Native assets
       - name: Bundle React Native assets
+        if: success()
         run: |
           mkdir -p android/app/build/intermediates/assets/release/
           npx react-native bundle \
@@ -110,8 +107,9 @@ jobs:
             --assets-dest android/app/build/intermediates/res/merged/release
         working-directory: telon-gateway-app
 
-      # 🔟 Generate random keystore
+      # 1️⃣2️⃣ Generate random keystore
       - name: Generate random Keystore
+        if: success()
         run: |
           KEYSTORE_PATH="android/app/my-release-key.keystore"
           if [ ! -f "$KEYSTORE_PATH" ]; then
@@ -128,8 +126,9 @@ jobs:
           fi
         working-directory: telon-gateway-app
 
-      # 1️⃣1️⃣ Set APK metadata
+      # 1️⃣3️⃣ Set APK metadata
       - name: Set APK Metadata
+        if: success()
         run: |
           MANIFEST_FILE=android/app/src/main/AndroidManifest.xml
           sed -i 's|android:label=".*"|android:label="JOOLIO GSM Gateway"|' $MANIFEST_FILE
@@ -139,22 +138,25 @@ jobs:
           <meta-data android:name="Website" android:value="https://joolio.me"/>' $MANIFEST_FILE
         working-directory: telon-gateway-app
 
-      # 1️⃣2️⃣ Build APK
+      # 1️⃣4️⃣ Build Android Release APK
       - name: Build Android Release APK
+        if: success()
         working-directory: telon-gateway-app/android
         run: |
           chmod +x gradlew
           ./gradlew clean assembleRelease -Pkeystore.password=$KEYSTORE_PASSWORD
 
-      # 1️⃣3️⃣ Copy APK to dist
+      # 1️⃣5️⃣ Copy APK to dist
       - name: Copy APK
+        if: success()
         run: |
           mkdir -p $GITHUB_WORKSPACE/dist
           cp app/build/outputs/apk/release/*.apk "$GITHUB_WORKSPACE/dist/JOOLIO GSM Gateway.apk"
         working-directory: telon-gateway-app/android
 
-      # 1️⃣4️⃣ Upload APK artifact
+      # 1️⃣6️⃣ Upload APK
       - name: Upload APK artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
