@@ -1,4 +1,4 @@
-name: Build Android APK (JOOLIO GSM Gateway + Versioning)
+name: Build Android APK (Lightweight, No sdkmanager)
 
 on:
   push:
@@ -8,63 +8,52 @@ on:
 jobs:
   build_android:
     runs-on: ubuntu-latest
-
     steps:
-      # 1️⃣ Checkout
+      # 1️⃣ Checkout repo
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Cache Node modules
-      - name: Cache Node.js modules
-        uses: actions/cache@v4
-        with:
-          path: telon-gateway-app/node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('telon-gateway-app/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-modules-
-
-      # 3️⃣ Cache Gradle
-      - name: Cache Gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper/
-          key: ${{ runner.os }}-gradle-${{ hashFiles('telon-gateway-app/android/gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-
-      # 4️⃣ Setup Node.js 18
+      # 2️⃣ Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      # 5️⃣ Install OpenJDK 17
-      - name: Install OpenJDK 17
+      # 3️⃣ Install OpenJDK 11 (Runner default usually enough)
+      - name: Install JDK
         run: |
           sudo apt update
-          sudo apt install -y openjdk-17-jdk
-          echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> $GITHUB_ENV
+          sudo apt install -y openjdk-11-jdk
+          echo "JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64" >> $GITHUB_ENV
 
-      # 6️⃣ Setup Android SDK with valid packages
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          cmdline-tools-version: "latest"
-          accept-android-sdk-licenses: true
-          packages: |
-            platforms;android-19
-            build-tools;25.2.5
-            ndk;17.2.4988734
+      # 4️⃣ Download command line tools (cmdline-tools)
+      - name: Download Android Command-line Tools
+        run: |
+          mkdir -p $HOME/android-sdk/cmdline-tools
+          curl -L -o cmdline-tools.zip https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+          unzip -q cmdline-tools.zip -d $HOME/android-sdk/cmdline-tools
+          mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
+          rm cmdline-tools.zip
+          echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
+          echo "$HOME/android-sdk/cmdline-tools/latest/bin:$PATH" >> $GITHUB_ENV
 
-      # 7️⃣ Install NPM dependencies
-      - name: Install dependencies
+      # 5️⃣ Download specific NDK manually
+      - name: Download NDK r17b
+        run: |
+          mkdir -p $HOME/android-ndk
+          curl -L -o android-ndk.zip https://dl.google.com/android/repository/android-ndk-r17b-linux-x86_64.zip
+          unzip -q android-ndk.zip -d $HOME/android-ndk
+          rm android-ndk.zip
+          echo "NDK_HOME=$HOME/android-ndk/android-ndk-r17b" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$HOME/android-ndk/android-ndk-r17b" >> $GITHUB_ENV
+
+      # 6️⃣ Install NPM dependencies
+      - name: Install NPM dependencies
         run: npm ci
         working-directory: telon-gateway-app
 
-      # 8️⃣ Bundle React Native assets
-      - name: Bundle React Native assets
+      # 7️⃣ Bundle React Native assets
+      - name: Bundle React Native
         run: |
           mkdir -p android/app/build/intermediates/assets/release/
           npx react-native bundle \
@@ -75,8 +64,8 @@ jobs:
             --assets-dest android/app/build/intermediates/res/merged/release
         working-directory: telon-gateway-app
 
-      # 9️⃣ Generate random keystore
-      - name: Generate Random Keystore
+      # 8️⃣ Generate random keystore
+      - name: Generate random Keystore
         run: |
           KEYSTORE_PATH="telon-gateway-app/android/app/my-release-key.keystore"
           if [ ! -f "$KEYSTORE_PATH" ]; then
@@ -93,16 +82,15 @@ jobs:
               -dname "CN=Mohammad Yazdizadeh, OU=Dev, O=JOOLIO, L=City, S=State, C=US"
           fi
 
-      # 🔟 Set versionCode and versionName automatically
+      # 9️⃣ Set versionCode and versionName automatically
       - name: Set APK Version
         run: |
           BUILD_DATE=$(date +%Y%m%d)
           BUILD_NUMBER=$(date +%H%M%S)
           sed -i "s/versionCode [0-9]\+/versionCode $BUILD_NUMBER/" telon-gateway-app/android/app/build.gradle
           sed -i "s/versionName \".*\"/versionName \"$BUILD_DATE-$BUILD_NUMBER\"/" telon-gateway-app/android/app/build.gradle
-          echo "Set versionCode=$BUILD_NUMBER and versionName=$BUILD_DATE-$BUILD_NUMBER"
 
-      # 1️⃣1️⃣ Set application metadata
+      # 🔟 Set application metadata
       - name: Set APK Metadata
         run: |
           MANIFEST_FILE=telon-gateway-app/android/app/src/main/AndroidManifest.xml
@@ -112,46 +100,22 @@ jobs:
           <meta-data android:name="Company" android:value="JOOLIO"/>\
           <meta-data android:name="Website" android:value="https://joolio.me"/>' $MANIFEST_FILE
 
-      # 1️⃣2️⃣ Build APK
+      # 1️⃣1️⃣ Build APK
       - name: Build Android Release APK
         working-directory: telon-gateway-app/android
         run: |
           chmod +x gradlew
           ./gradlew clean assembleRelease -Pkeystore.password=$PASSWORD
 
-      # 1️⃣3️⃣ Copy APK with fixed name
-      - name: Copy APK to dist
+      # 1️⃣2️⃣ Copy APK to dist
+      - name: Copy APK
         run: |
           mkdir -p $GITHUB_WORKSPACE/dist
           cp app/build/outputs/apk/release/*.apk "$GITHUB_WORKSPACE/dist/JOOLIO GSM Gateway.apk"
-        shell: bash
 
-      # 1️⃣4️⃣ Upload APK artifact
-      - name: Upload APK to GitHub
+      # 1️⃣3️⃣ Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
           path: $GITHUB_WORKSPACE/dist/JOOLIO\ GSM\ Gateway.apk
-
-      # 1️⃣5️⃣ Update README with APK link
-      - name: Update README with APK link
-        if: success()
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GH_TOKEN }}
-          script: |
-            const artifactName = "android-apk";
-            const run_id = process.env.GITHUB_RUN_ID;
-            const repo = process.env.GITHUB_REPOSITORY;
-            const owner = repo.split('/')[0];
-            const repoName = repo.split('/')[1];
-            const url = `https://github.com/${owner}/${repoName}/suites/${run_id}/artifacts`;
-
-            const fs = require('fs');
-            const readmePath = 'README.md';
-            let readme = fs.existsSync(readmePath) ? fs.readFileSync(readmePath, 'utf8') : '';
-            const apkLine = `\n[Download Latest APK - JOOLIO GSM Gateway](${url})\n`;
-            if (!readme.includes(apkLine)) {
-              readme += apkLine;
-              fs.writeFileSync(readmePath, readme, 'utf8');
-            }
