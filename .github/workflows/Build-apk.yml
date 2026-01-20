@@ -76,19 +76,21 @@ jobs:
         run: npm install
         working-directory: telon-gateway-app
 
-      # 🔹 Upload npm logs on failure with path info
-      - name: Upload npm logs
-        if: failure()
+      # 🔹 Save npm logs always
+      - name: Save npm logs
         run: |
           mkdir -p $GITHUB_WORKSPACE/logs
-          for f in /home/runner/.npm/_logs/*.log; do
-            echo "Copying npm log file: $f"
-            cp "$f" $GITHUB_WORKSPACE/logs/
-          done
+          if compgen -G "/home/runner/.npm/_logs/*.log" > /dev/null; then
+            for f in /home/runner/.npm/_logs/*.log; do
+              echo "Saving npm log file: $f"
+              cp "$f" $GITHUB_WORKSPACE/logs/
+            done
+          else
+            echo "No npm log files found"
+          fi
         continue-on-error: true
 
       - name: Upload npm log artifact
-        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: npm-logs
