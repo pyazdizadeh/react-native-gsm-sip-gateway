@@ -1,4 +1,4 @@
-name: Build Android APK (Stable, Node 18, Metro Fix)
+name: Build Android APK (Node 18, RN Metro Fix)
 
 on:
   push:
@@ -8,6 +8,11 @@ on:
 jobs:
   build_android:
     runs-on: ubuntu-latest
+    env:
+      ANDROID_HOME: ${{ runner.temp }}/android-sdk
+      ANDROID_SDK_ROOT: ${{ runner.temp }}/android-sdk
+      JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
+
     steps:
       # 1️⃣ Checkout repo
       - name: Checkout Repository
@@ -21,55 +26,58 @@ jobs:
 
       # 3️⃣ Install OpenJDK 11
       - name: Install OpenJDK
-        run: |
-          sudo apt update
-          sudo apt install -y openjdk-11-jdk
-          echo "JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64" >> $GITHUB_ENV
+        run: sudo apt-get update && sudo apt-get install -y openjdk-11-jdk
 
-      # 4️⃣ Download Android cmdline-tools
-      - name: Download Android Command-line Tools
+      # 4️⃣ Install Android SDK cmdline-tools
+      - name: Install Android SDK Command-line Tools
         run: |
-          mkdir -p $HOME/android-sdk/cmdline-tools
+          mkdir -p $ANDROID_HOME/cmdline-tools
           curl -L -o cmdline-tools.zip https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
-          unzip -q cmdline-tools.zip -d $HOME/android-sdk/cmdline-tools
-          mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
+          unzip -q cmdline-tools.zip -d $ANDROID_HOME/cmdline-tools
+          mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest
           rm cmdline-tools.zip
-          echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
-          echo "PATH=$HOME/android-sdk/cmdline-tools/latest/bin:$PATH" >> $GITHUB_ENV
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
 
-      # 5️⃣ Download NDK r17b
-      - name: Download NDK r17b
+      # 5️⃣ Accept SDK licenses
+      - name: Accept SDK licenses
+        run: yes | sdkmanager --licenses
+
+      # 6️⃣ Install NDK r17b
+      - name: Install Android NDK r17b
         run: |
           mkdir -p $HOME/android-ndk
           curl -L -o android-ndk.zip https://dl.google.com/android/repository/android-ndk-r17b-linux-x86_64.zip
           unzip -q android-ndk.zip -d $HOME/android-ndk
           rm android-ndk.zip
+          echo "$HOME/android-ndk/android-ndk-r17b" >> $GITHUB_PATH
           echo "NDK_HOME=$HOME/android-ndk/android-ndk-r17b" >> $GITHUB_ENV
           echo "ANDROID_NDK_HOME=$HOME/android-ndk/android-ndk-r17b" >> $GITHUB_ENV
 
-      # 6️⃣ Clean node_modules and cache
+      # 7️⃣ Validate package.json
+      - name: Validate package.json
+        run: cat telon-gateway-app/package.json | jq .
+
+      # 8️⃣ Clean node_modules and cache
       - name: Clean node_modules
         run: |
-          rm -rf node_modules
-          rm -f package-lock.json
+          rm -rf node_modules package-lock.json
           npm cache clean --force
         working-directory: telon-gateway-app
 
-      # 7️⃣ Ensure Metro config exists
+      # 9️⃣ Ensure Metro config
       - name: Setup Metro config
         run: |
-          mkdir -p .
           if [ ! -f metro.config.js ]; then
             curl -L -o metro.config.js https://raw.githubusercontent.com/react-native-community/template/main/template/metro.config.js
           fi
         working-directory: telon-gateway-app
 
-      # 8️⃣ Install NPM dependencies
-      - name: Install NPM dependencies
+      # 🔟 Install npm dependencies
+      - name: Install npm dependencies
         run: npm install
         working-directory: telon-gateway-app
 
-      # 9️⃣ Bundle React Native assets
+      # 1️⃣1️⃣ Bundle React Native assets
       - name: Bundle React Native assets
         run: |
           mkdir -p android/app/build/intermediates/assets/release/
@@ -81,7 +89,7 @@ jobs:
             --assets-dest android/app/build/intermediates/res/merged/release
         working-directory: telon-gateway-app
 
-      # 🔟 Generate random keystore
+      # 1️⃣2️⃣ Generate random Keystore
       - name: Generate random Keystore
         run: |
           KEYSTORE_PATH="android/app/my-release-key.keystore"
@@ -99,7 +107,7 @@ jobs:
           fi
         working-directory: telon-gateway-app
 
-      # 1️⃣1️⃣ Set APK metadata
+      # 1️⃣3️⃣ Set APK metadata
       - name: Set APK Metadata
         run: |
           MANIFEST_FILE=android/app/src/main/AndroidManifest.xml
@@ -110,21 +118,21 @@ jobs:
           <meta-data android:name="Website" android:value="https://joolio.me"/>' $MANIFEST_FILE
         working-directory: telon-gateway-app
 
-      # 1️⃣2️⃣ Build APK
+      # 1️⃣4️⃣ Build APK
       - name: Build Android Release APK
         working-directory: telon-gateway-app/android
         run: |
           chmod +x gradlew
           ./gradlew clean assembleRelease -Pkeystore.password=$KEYSTORE_PASSWORD
 
-      # 1️⃣3️⃣ Copy APK to dist
+      # 1️⃣5️⃣ Copy APK to dist
       - name: Copy APK
         run: |
           mkdir -p $GITHUB_WORKSPACE/dist
           cp app/build/outputs/apk/release/*.apk "$GITHUB_WORKSPACE/dist/JOOLIO GSM Gateway.apk"
         working-directory: telon-gateway-app/android
 
-      # 1️⃣4️⃣ Upload APK
+      # 1️⃣6️⃣ Upload APK
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
