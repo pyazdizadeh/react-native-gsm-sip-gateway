@@ -38,4 +38,8 @@
   "jest": {
     "preset": "react-native"
   }
+
+  "devDependencies": {
+  "@react-native-community/cli": "latest"
+  }
 }
