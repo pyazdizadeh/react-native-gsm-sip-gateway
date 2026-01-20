@@ -1,4 +1,4 @@
-name: Build Android APK (Lightweight, Stable)
+name: Build Android APK (Stable, Node 18, Local Package Fix)
 
 on:
   push:
@@ -19,7 +19,7 @@ jobs:
         with:
           node-version: 18
 
-      # 3️⃣ Install JDK 11 (enough for gradle & build)
+      # 3️⃣ Install OpenJDK 11
       - name: Install OpenJDK
         run: |
           sudo apt update
@@ -34,7 +34,6 @@ jobs:
           unzip -q cmdline-tools.zip -d $HOME/android-sdk/cmdline-tools
           mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
           rm cmdline-tools.zip
-          # Set environment variables properly
           echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
           echo "PATH=$HOME/android-sdk/cmdline-tools/latest/bin:$PATH" >> $GITHUB_ENV
 
@@ -71,7 +70,6 @@ jobs:
           KEYSTORE_PATH="telon-gateway-app/android/app/my-release-key.keystore"
           if [ ! -f "$KEYSTORE_PATH" ]; then
             PASSWORD=$(openssl rand -base64 12)
-            echo "Random keystore password: $PASSWORD"
             echo "$PASSWORD" >> $GITHUB_ENV
             keytool -genkey -v \
               -keystore "$KEYSTORE_PATH" \
